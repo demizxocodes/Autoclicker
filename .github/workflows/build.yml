@@ -1,0 +1,45 @@
+name: Build Windows exe
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller pytest
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Build Autoclicker.exe
+        run: >
+          pyinstaller --noconfirm --onefile --windowed --name Autoclicker
+          --hidden-import pynput.keyboard._win32
+          --hidden-import pynput.mouse._win32
+          main.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Autoclicker-windows
+          path: dist/Autoclicker.exe
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Autoclicker.exe
