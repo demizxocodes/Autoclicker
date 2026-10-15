@@ -38,8 +38,12 @@ jobs:
           name: Autoclicker-windows
           path: dist/Autoclicker.exe
 
+      # Every push to main (or a v* tag) becomes a downloadable release.
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
           files: dist/Autoclicker.exe

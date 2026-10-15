@@ -40,8 +40,8 @@ Run the tests with `pip install pytest && python -m pytest`.
 
 ## Building the exe
 
-Every push to `main` builds `Autoclicker.exe` with GitHub Actions (download it from
-the run's *Artifacts*). Pushing a tag like `v1.0.1` also publishes it as a Release.
+Every push to `main` builds `Autoclicker.exe` with GitHub Actions and publishes it
+as a new Release (`v1.0.<build number>`). Pushing a tag like `v2.0.0` releases under that name.
 To build locally on Windows:
 
 ```
