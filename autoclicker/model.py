@@ -29,6 +29,11 @@ class ClickPoint:
     delay: float = 1.0  # seconds to wait before this click
     button: str = "left"
     clicks: int = 1  # 1 = single click, 2 = double click
+    # Window this point belongs to, for background clicking (Windows only).
+    window_title: str = ""
+    window_class: str = ""
+    rel_x: int = 0  # position inside that window's client area
+    rel_y: int = 0
 
     @classmethod
     def from_dict(cls, data: dict) -> "ClickPoint":
@@ -41,6 +46,10 @@ class ClickPoint:
             delay=max(MIN_DELAY, float(data.get("delay", 1.0))),
             button=button if button in BUTTONS else "left",
             clicks=clicks if clicks in CLICK_TYPES else 1,
+            window_title=str(data.get("window_title", "")),
+            window_class=str(data.get("window_class", "")),
+            rel_x=int(data.get("rel_x", 0)),
+            rel_y=int(data.get("rel_y", 0)),
         )
 
 
@@ -50,6 +59,7 @@ class RunSettings:
     rounds: int = 10
     duration: float = 1.0
     duration_unit: str = "minutes"
+    background: bool = True  # click without moving the real mouse
 
     @property
     def duration_seconds(self) -> float:
@@ -64,6 +74,7 @@ class RunSettings:
             rounds=max(1, int(data.get("rounds", 10))),
             duration=max(0.0, float(data.get("duration", 1.0))),
             duration_unit=unit if unit in TIME_UNITS else "minutes",
+            background=bool(data.get("background", True)),
         )
 
 

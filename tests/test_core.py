@@ -82,8 +82,8 @@ def test_store_round_trip(tmp_path):
     store.load()
     assert list(store.profiles) == ["Default"]
     store.profiles["Farm"] = Profile(
-        points=[ClickPoint("A", 100, 200, 1.5, "right", 2)],
-        settings=RunSettings(mode="time", duration=2, duration_unit="hours"),
+        points=[ClickPoint("A", 100, 200, 1.5, "right", 2, "Game", "GameWnd", 40, 50)],
+        settings=RunSettings(mode="time", duration=2, duration_unit="hours", background=False),
     )
     store.last_profile = "Farm"
     store.save()
@@ -117,3 +117,13 @@ def test_bad_values_are_clamped(tmp_path):
     assert store.profiles["P"].settings.mode == "forever"
     assert store.profiles["P"].settings.rounds == 1
     assert store.last_profile == "P"
+
+
+def test_old_profiles_default_to_background(tmp_path):
+    path = tmp_path / "profiles.json"
+    path.write_text(json.dumps({"profiles": {"P": {"points": [{"name": "A", "x": 1, "y": 2}]}}}))
+    store = ProfileStore(path)
+    store.load()
+    p = store.profiles["P"]
+    assert p.settings.background is True
+    assert (p.points[0].window_class, p.points[0].rel_x) == ("", 0)

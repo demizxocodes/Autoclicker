@@ -23,7 +23,8 @@ def pick_location(
 ) -> None:
     """Hide the main window, let the user click a spot, then call callback((x, y)).
 
-    callback(None) means the user cancelled with Esc or right-click.
+    callback(None) means the user cancelled with Esc or right-click. The callback
+    runs while the screen is uncovered, before the main window reappears.
     """
     root.withdraw()
     # Give the main window a moment to vanish before covering the screen.
@@ -65,9 +66,14 @@ def _show_overlay(root, point_name, callback):
         done = True
         overlay.destroy()
         tip.destroy()
-        root.deiconify()
-        root.lift()
-        callback(result)
+        # Callback runs before the main window comes back, so it can still
+        # see which app window is under the picked spot.
+        root.update()
+        try:
+            callback(result)
+        finally:
+            root.deiconify()
+            root.lift()
 
     def on_motion(event):
         text.set(

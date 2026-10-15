@@ -19,6 +19,7 @@ from .model import (
 )
 from .picker import pick_location
 from .runner import ROUNDS_DONE, STOPPED, TIME_UP, ClickRunner
+from . import winclick
 
 HOTKEY = "F6"
 SAVE_DELAY_MS = 400
@@ -28,10 +29,11 @@ CLICK_TYPE_BY_LABEL = {label: n for n, label in CLICK_TYPES.items()}
 
 
 class App:
-    def __init__(self, root: tk.Tk, store: ProfileStore, click):
+    def __init__(self, root: tk.Tk, store: ProfileStore, clickers: dict, window_at=lambda x, y: None):
         self.root = root
         self.store = store
-        self.click = click
+        self.clickers = clickers  # "mouse" and "background" click functions
+        self.window_at = window_at
         self.events: queue.Queue = queue.Queue()  # messages from worker threads
         self.runner: ClickRunner | None = None
         self.selected: int | None = None
@@ -39,7 +41,7 @@ class App:
         self._save_job = None
 
         root.title("Autoclicker")
-        root.minsize(620, 520)
+        root.minsize(680, 560)
         root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self._build_profile_bar()
@@ -74,13 +76,13 @@ class App:
         frame = ttk.LabelFrame(self.root, text="Click sequence (runs top to bottom, then repeats)", padding=8)
         frame.pack(fill="both", expand=True, padx=10, pady=(10, 0))
 
-        cols = ("name", "x", "y", "delay", "button", "type")
-        headings = ("Point", "X", "Y", "Wait before click", "Button", "Click")
-        widths = (70, 70, 70, 130, 80, 80)
+        cols = ("name", "x", "y", "delay", "button", "type", "window")
+        headings = ("Point", "X", "Y", "Wait before click", "Button", "Click", "Window")
+        widths = (55, 60, 60, 115, 65, 65, 160)
         self.tree = ttk.Treeview(frame, columns=cols, show="headings", height=8, selectmode="browse")
         for col, head, width in zip(cols, headings, widths):
             self.tree.heading(col, text=head)
-            self.tree.column(col, width=width, anchor="center")
+            self.tree.column(col, width=width, anchor="w" if col == "window" else "center")
         self.tree.pack(side="left", fill="both", expand=True)
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
         self.tree.bind("<Double-1>", lambda e: self.repick_point())
@@ -168,7 +170,25 @@ class App:
         ttk.Label(frame, text="One round = every point in the list clicked once.", foreground="gray").grid(
             row=1, column=0, columnspan=7, sticky="w", pady=(6, 0)
         )
-        for var in (self.mode_var, self.rounds_var, self.duration_var, self.unit_var):
+
+        self.background_var = tk.BooleanVar()
+        how = ttk.Frame(frame)
+        how.grid(row=2, column=0, columnspan=7, sticky="w", pady=(10, 0))
+        ttk.Label(how, text="Clicking:").pack(side="left")
+        ttk.Radiobutton(
+            how, text="In the background (my mouse stays free)", variable=self.background_var, value=True
+        ).pack(side="left", padx=(8, 0))
+        ttk.Radiobutton(how, text="Move the real mouse", variable=self.background_var, value=False).pack(
+            side="left", padx=(16, 0)
+        )
+        ttk.Label(
+            frame,
+            text="Background works with most apps, even behind other windows (not minimized). "
+            "If an app or game ignores it, use 'Move the real mouse'.",
+            foreground="gray",
+        ).grid(row=3, column=0, columnspan=7, sticky="w", pady=(4, 0))
+
+        for var in (self.mode_var, self.rounds_var, self.duration_var, self.unit_var, self.background_var):
             var.trace_add("write", lambda *a: self._on_settings_edit())
 
     def _build_controls(self):
@@ -200,6 +220,7 @@ class App:
         self.rounds_var.set(str(s.rounds))
         self.duration_var.set(f"{s.duration:g}")
         self.unit_var.set(s.duration_unit)
+        self.background_var.set(s.background)
         self._loading = False
         self.selected = None
         self._refresh_tree(select=0 if self.profile.points else None)
@@ -260,7 +281,7 @@ class App:
     # ---------- point list ----------
 
     def _row_values(self, p: ClickPoint):
-        return (p.name, p.x, p.y, f"{p.delay:g} s", p.button, CLICK_TYPES[p.clicks])
+        return (p.name, p.x, p.y, f"{p.delay:g} s", p.button, CLICK_TYPES[p.clicks], p.window_title or "-")
 
     def _refresh_tree(self, select: int | None = None):
         self.tree.delete(*self.tree.get_children())
@@ -339,7 +360,9 @@ class App:
                 return
             # New points copy the previous point's wait so a sequence is quick to build.
             delay = self.profile.points[-1].delay if self.profile.points else 1.0
-            self.profile.points.append(ClickPoint(name=name, x=pos[0], y=pos[1], delay=delay))
+            point = ClickPoint(name=name, x=pos[0], y=pos[1], delay=delay)
+            self._remember_window(point)
+            self.profile.points.append(point)
             self._refresh_tree(select=len(self.profile.points) - 1)
             self.schedule_save()
 
@@ -355,10 +378,17 @@ class App:
             if pos is None:
                 return
             p.x, p.y = pos
+            self._remember_window(p)
             self._refresh_tree(select=index)
             self.schedule_save()
 
         pick_location(self.root, p.name, got)
+
+    def _remember_window(self, p: ClickPoint):
+        spot = self.window_at(p.x, p.y)
+        if spot:
+            p.window_title, p.window_class = spot.title, spot.class_name
+            p.rel_x, p.rel_y = spot.rel_x, spot.rel_y
 
     def remove_point(self):
         if self.selected is None:
@@ -398,6 +428,7 @@ class App:
             pass
         if self.unit_var.get() in TIME_UNITS:
             s.duration_unit = self.unit_var.get()
+        s.background = self.background_var.get()
         self.schedule_save()
 
     def _validate_settings(self) -> str | None:
@@ -414,6 +445,15 @@ class App:
                     raise ValueError
             except ValueError:
                 return "Run time must be a number greater than 0."
+        if self.background_var.get():
+            if not winclick.SUPPORTED:
+                return "Background clicking only works on Windows. Choose 'Move the real mouse'."
+            missing = [p.name for p in self.profile.points if not p.window_class]
+            if missing:
+                return (
+                    f"Point(s) {', '.join(missing)} don't know which window they belong to yet. "
+                    "Select each one and click 'Re-pick location', or choose 'Move the real mouse'."
+                )
         return None
 
     # ---------- running ----------
@@ -440,7 +480,7 @@ class App:
         self.runner = ClickRunner(
             self.profile.points,
             self.profile.settings,
-            self.click,
+            self.clickers["background" if self.profile.settings.background else "mouse"],
             on_progress=lambda rnd, i: self.events.put(("progress", rnd, i)),
             on_finish=lambda reason: self.events.put(("finished", reason)),
         )
@@ -514,7 +554,7 @@ def main():
     controller = mouse.Controller()
     buttons = {"left": mouse.Button.left, "right": mouse.Button.right, "middle": mouse.Button.middle}
 
-    def click(point: ClickPoint):
+    def mouse_click(point: ClickPoint):
         controller.position = (point.x, point.y)
         controller.click(buttons[point.button], point.clicks)
 
@@ -522,7 +562,12 @@ def main():
     store.load()
 
     root = tk.Tk()
-    app = App(root, store, click)
+    app = App(
+        root,
+        store,
+        {"mouse": mouse_click, "background": winclick.background_click},
+        window_at=winclick.window_at,
+    )
 
     def on_key(key):
         if key == keyboard.Key.f6:

@@ -21,7 +21,13 @@ click **More info → Run anyway**.
    - Double-click a row (or **Re-pick location**) to choose a new spot.
 4. Under **How long to run**, choose to run until you stop it, for a number of rounds,
    or for a set time.
-5. Press **Start** or **F6** (works even when the window is in the background).
+5. Choose how it clicks:
+   - **In the background (my mouse stays free)** (default): clicks are sent straight to the
+     app window, so you can keep using your mouse. The app can be behind other windows,
+     but not minimized. Each point remembers which window it was picked on.
+   - **Move the real mouse**: moves the cursor and clicks for real. Use this if an app or
+     game ignores background clicks (many games and some protected apps do).
+6. Press **Start** or **F6** (works even when the window is in the background).
    Press **F6** again to stop.
 
 ### Profiles
