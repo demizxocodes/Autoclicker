@@ -4,6 +4,8 @@ A small Windows autoclicker. Pick spots on your screen (A, B, C, ...), choose ho
 long to wait before each click, and it clicks them in order, then repeats.
 Your click spots are saved, so you only set them up once.
 
+![Autoclicker window](docs/screenshot.png)
+
 ## Download
 
 Get **Autoclicker.exe** from the [Releases](../../releases) page and run it. Nothing

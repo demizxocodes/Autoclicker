@@ -19,7 +19,7 @@ from .model import (
 )
 from .picker import pick_location
 from .runner import ROUNDS_DONE, STOPPED, TIME_UP, ClickRunner
-from . import winclick
+from . import theme, winclick
 
 HOTKEY = "F6"
 SAVE_DELAY_MS = 400
@@ -70,7 +70,7 @@ class App:
             ("Delete", self.delete_profile),
         ):
             ttk.Button(bar, text=label, command=cmd, width=8).pack(side="left", padx=2)
-        ttk.Label(bar, text="(saved automatically)", foreground="gray").pack(side="right")
+        ttk.Label(bar, text="(saved automatically)", style="Muted.TLabel").pack(side="right")
 
     def _build_points(self):
         frame = ttk.LabelFrame(self.root, text="Click sequence (runs top to bottom, then repeats)", padding=8)
@@ -135,7 +135,7 @@ class App:
         ttk.Label(
             frame,
             text="'Wait' = how long to wait before this point is clicked. Double-click a row to re-pick its location.",
-            foreground="gray",
+            style="Muted.TLabel",
         ).grid(row=1, column=0, columnspan=12, sticky="w", pady=(6, 0))
 
         for var in (self.name_var, self.x_var, self.y_var, self.delay_var, self.button_var, self.type_var):
@@ -150,30 +150,30 @@ class App:
         self.duration_var = tk.StringVar()
         self.unit_var = tk.StringVar()
 
-        ttk.Radiobutton(frame, text="Until I stop it", variable=self.mode_var, value="forever").grid(
-            row=0, column=0, sticky="w"
+        limit = ttk.Frame(frame)
+        limit.grid(row=0, column=0, sticky="w")
+        ttk.Radiobutton(limit, text="Until I stop it", variable=self.mode_var, value="forever").pack(side="left")
+        ttk.Radiobutton(limit, text="Stop after", variable=self.mode_var, value="rounds").pack(
+            side="left", padx=(20, 4)
         )
-        ttk.Radiobutton(frame, text="Stop after", variable=self.mode_var, value="rounds").grid(
-            row=0, column=1, sticky="w", padx=(20, 4)
+        ttk.Spinbox(limit, textvariable=self.rounds_var, from_=1, to=1_000_000, width=7).pack(side="left")
+        ttk.Label(limit, text="rounds").pack(side="left", padx=(4, 0))
+        ttk.Radiobutton(limit, text="Stop after", variable=self.mode_var, value="time").pack(
+            side="left", padx=(20, 4)
         )
-        ttk.Spinbox(frame, textvariable=self.rounds_var, from_=1, to=1_000_000, width=7).grid(row=0, column=2)
-        ttk.Label(frame, text="rounds").grid(row=0, column=3, padx=(4, 0))
-        ttk.Radiobutton(frame, text="Stop after", variable=self.mode_var, value="time").grid(
-            row=0, column=4, sticky="w", padx=(20, 4)
+        ttk.Spinbox(limit, textvariable=self.duration_var, from_=0.1, to=100_000, increment=1, width=7).pack(
+            side="left"
         )
-        ttk.Spinbox(frame, textvariable=self.duration_var, from_=0.1, to=100_000, increment=1, width=7).grid(
-            row=0, column=5
+        ttk.Combobox(limit, textvariable=self.unit_var, values=list(TIME_UNITS), state="readonly", width=8).pack(
+            side="left", padx=(4, 0)
         )
-        ttk.Combobox(frame, textvariable=self.unit_var, values=list(TIME_UNITS), state="readonly", width=8).grid(
-            row=0, column=6, padx=(4, 0)
-        )
-        ttk.Label(frame, text="One round = every point in the list clicked once.", foreground="gray").grid(
-            row=1, column=0, columnspan=7, sticky="w", pady=(6, 0)
+        ttk.Label(frame, text="One round = every point in the list clicked once.", style="Muted.TLabel").grid(
+            row=1, column=0, sticky="w", pady=(6, 0)
         )
 
         self.background_var = tk.BooleanVar()
         how = ttk.Frame(frame)
-        how.grid(row=2, column=0, columnspan=7, sticky="w", pady=(10, 0))
+        how.grid(row=2, column=0, sticky="w", pady=(10, 0))
         ttk.Label(how, text="Clicking:").pack(side="left")
         ttk.Radiobutton(
             how, text="In the background (my mouse stays free)", variable=self.background_var, value=True
@@ -185,8 +185,8 @@ class App:
             frame,
             text="Background works with most apps, even behind other windows (not minimized). "
             "If an app or game ignores it, use 'Move the real mouse'.",
-            foreground="gray",
-        ).grid(row=3, column=0, columnspan=7, sticky="w", pady=(4, 0))
+            style="Muted.TLabel",
+        ).grid(row=3, column=0, sticky="w", pady=(4, 0))
 
         for var in (self.mode_var, self.rounds_var, self.duration_var, self.unit_var, self.background_var):
             var.trace_add("write", lambda *a: self._on_settings_edit())
@@ -194,9 +194,7 @@ class App:
     def _build_controls(self):
         frame = ttk.Frame(self.root, padding=10)
         frame.pack(fill="x")
-        style = ttk.Style()
-        style.configure("Big.TButton", font=("Segoe UI", 12, "bold"), padding=8)
-        self.start_button = ttk.Button(frame, text=f"Start  ({HOTKEY})", style="Big.TButton", command=self.toggle)
+        self.start_button = ttk.Button(frame, text=f"Start  ({HOTKEY})", style="Accent.TButton", command=self.toggle)
         self.start_button.pack(side="left")
         self.status_var = tk.StringVar(value=f"Ready. Press {HOTKEY} anywhere to start or stop.")
         ttk.Label(frame, textvariable=self.status_var).pack(side="left", padx=12)
@@ -486,7 +484,7 @@ class App:
         )
         self._run_points = [p.name for p in self.profile.points]
         self._run_delays = [p.delay for p in self.profile.points]
-        self.start_button.configure(text=f"Stop  ({HOTKEY})")
+        self.start_button.configure(text=f"Stop  ({HOTKEY})", style="Stop.TButton")
         for b in self.point_buttons:
             b.state(["disabled"])
         self.runner.start()
@@ -511,7 +509,7 @@ class App:
         self.root.after(POLL_MS, self._poll_events)
 
     def _on_finished(self, reason: str):
-        self.start_button.configure(text=f"Start  ({HOTKEY})")
+        self.start_button.configure(text=f"Start  ({HOTKEY})", style="Accent.TButton")
         for b in self.point_buttons:
             b.state(["!disabled"])
         messages = {
@@ -562,12 +560,14 @@ def main():
     store.load()
 
     root = tk.Tk()
+    theme.apply_dark_theme(root)
     app = App(
         root,
         store,
         {"mouse": mouse_click, "background": winclick.background_click},
         window_at=winclick.window_at,
     )
+    theme.dark_title_bar(root)
 
     def on_key(key):
         if key == keyboard.Key.f6:
